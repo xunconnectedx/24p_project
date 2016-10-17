@@ -27,7 +27,7 @@ class RevizController extends Controller
         }
         else echo "Проблема соединения!\n";
     }
-	
+	//тестовое сообщения для гит
 	public function actionPars()
 	{
 		$rooturl='http://kristall-kino.ru';
