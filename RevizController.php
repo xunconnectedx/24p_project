@@ -30,15 +30,6 @@ class RevizController extends Controller
         else echo "Проблема соединения!\n";
     }
     
-    function pingsite($url)
-    {
-        $ping = exec('ping -c2 ' . $url);
-        preg_match("/\/([0-9]*\.[0-9]*)\/[0-9]*\./", $ping, $outping);
-        if (empty($outping)) return '-';
-            else return $outping[1];
-
-    }
-
 	public function actionPars()
 	{
 		//$rooturl='http://kristall-kino.ru';
@@ -118,7 +109,7 @@ class RevizController extends Controller
             		$modelUrls = new Urls;	
             		$modelUrls->hash = $this->hash_test($url1);
 					$modelUrls->url = $url1;
-                    $modelUrls->ping = $this->pingsite($url1);//пинг
+                    $modelUrls->ping = $this->pingsite(substr($url1,7));;//пинг
 					$modelUrls->save();
 			    } else echo "Проблема соединения";
 			}
@@ -131,4 +122,13 @@ class RevizController extends Controller
 		return hash_file('sha1', 'File.html');
 		//unlink("File.html");
 	}   
+
+	    function pingsite($url) // П Е Р Е Д Е Л А Т Ь
+    {
+    	return '-';
+        /*$ping = exec('ping -c2 ' . $url);
+        preg_match("/\/([0-9]*\.[0-9]*)\/[0-9]*\./", $ping, $outping);
+        if (empty($outping)) return '-';
+            else return $outping[1];*/
+    }
 }    

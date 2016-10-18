@@ -10,9 +10,10 @@ use yii\httpclient\Client;
 
 class RevizWgetController extends Controller
 {
+    public static $rooturl='http://kristall-kino.ru';
     public function actionWgetDownload()
     {
-        exec('wget -q -r -l 0 -p -U Googlebot -P site ' . 'http://kristall-kino.ru');
+        exec('wget -q -E -r -l 0 -p -U Googlebot -P site ' . 'http://kristall-kino.ru');
     }
 
     public function actionWgetRec()
@@ -46,25 +47,35 @@ class RevizWgetController extends Controller
                 else
                 {   
                     $val = $dir . "/" . $value;
-                    echo "$val\n" . hash_file('sha1', $val) . "\n\n";
+                    //echo "$val\n" . hash_file('sha1', $val) . "\n\n";
+
+                    if ((substr_count($value, '.jpg')||substr_count($value, '.JPG')||substr_count($value, '.PNG')||substr_count($value, '.png')||substr_count($value, '.css')||substr_count($value, '.CSS')||substr_count($value, '.js')||substr_count($value, '.JS')||substr_count($value, '.swf')||substr_count($value, '.SWF')||substr_count($value, '.ico')||substr_count($value, '.ICO')||substr_count($value, '.gif')||substr_count($value, '.GIF'))>0) 
+                    {
+                        $modelObjects = new Objects;    
+                        $modelObjects->hash = hash_file('sha1', $val);
+                        $modelObjects->url = 'http://' . substr($val,5);
+                        $modelObjects->save();
+                    } else
+                    {
                     $modelUrls = new Urls;  
                     $modelUrls->hash = hash_file('sha1', $val);
                     $modelUrls->url = 'http://' . substr($val,5);
                     $modelUrls->parsed = 0;
-                    $modelUrls->ping = $this->pingsite(substr(self::$rooturl,7));//пинг
+                    //echo "Пингую: ".substr(self::$rooturl,7)."\n";
+                    $modelUrls->ping = $this->pingsite(substr($val,5));//пинг
                     $modelUrls->save();      
-
+                    }
                 }
             }
         }
     }
 
-    function pingsite($url)
+    function pingsite($url)// П Е Р Е Д Е Л А Т Ь
     {
-        $ping = exec('ping -c2 ' . $url);
+        /*$ping = exec('ping -c2 ' . $url);
         preg_match("/\/([0-9]*\.[0-9]*)\/[0-9]*\./", $ping, $outping);
         if (empty($outping)) return '-';
-            else return $outping[1];
+            else return $outping[1];*/
 
     }
 }
