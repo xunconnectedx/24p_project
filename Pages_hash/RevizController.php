@@ -20,10 +20,14 @@ class RevizController extends Controller
         	->send();
         if($response->isOk)
         {
+            //mkdir(substr(self::$rooturl,7), 0700);
+            //file_put_contents(substr(self::$rooturl,7) . '/' . substr(self::$rooturl,7),$response->content);
         	$modelUrls = new Urls;	
         	$modelUrls->hash = $this->hash_test($response->content);
 			$modelUrls->url = self::$rooturl;
+            //echo $modelUrls->url;
 			$modelUrls->parsed = 0;
+			$modelUrls->urlhash = $this->hash_test(self::$rooturl);
             $modelUrls->ping = $this->pingsite(substr(self::$rooturl,7));//пинг
 			$modelUrls->save();
         }
@@ -57,7 +61,16 @@ class RevizController extends Controller
         if ($endPars>0) 
         {
             $this->actionPars(); //вызов рекурсивный    
-        } else {echo "Всего добавленно ".$countDown." ссылок и ".$countObject." объектов.\n";}
+        } else 
+            {
+                $find = Urls::find()->all();
+                foreach($find as $value)
+                {
+                    $value->parsed = 0;
+                    $value->save();   
+                }
+                echo "Всего добавленно ".$countDown." ссылок и ".$countObject." объектов.\n";
+            }
 	}
 
 	function Parsing($url)
@@ -82,16 +95,24 @@ class RevizController extends Controller
                 	{
                 		//echo "Пробую ".$url1.".\n";
                 		$count = Objects::find()->where(['url' => $url1])->count(); //ищем совпадения в базе
-        				if ($count>0) {continue;}
+        				if ($count>0) 
+                            {
+                                /*$find = Objects::find()->where(['url' => $url1])->one();////////////
+                                if ($find->hash==hash_test($response->content)) {*/continue;/*}
+                                else $izm =*/
+                            }
         				$client = new Client();
         				$response = $client->createRequest()->setUrl($url1)
         					->setOptions(['userAgent'=> 'Googlebot'])->send();
         				if($response->isOk)
         				{
         					$countObject = $countObject+1; //счет выгруженных ссылок
+                            if (!is_dir('site')) mkdir("site", 0777); //создаем папку для файлов
         					echo "Выгружаю в базу ".$url1."\n";
             				$modelObjects = new Objects;	
-            				$modelObjects->hash = $this->hash_test($url1);
+                            file_put_contents("site/" . $this->hash_test($url1),$response->content);///
+            				$modelObjects->hash = $this->hash_test($response->content);
+            				$modelObjects->urlhash = $this->hash_test($url1);
 							$modelObjects->url = $url1;
 							$modelObjects->save();
 			    		} else echo "Проблема соединения";
@@ -106,15 +127,64 @@ class RevizController extends Controller
         		{
         			$countDown = $countDown+1; //счет выгруженных ссылок
         			echo "Выгружаю в базу ".$url1."\n";
+                    if (!is_dir('site')) mkdir("site", 0777); //папка для файлов
             		$modelUrls = new Urls;	
-            		$modelUrls->hash = $this->hash_test($url1);
+                    file_put_contents("site/" . $this->hash_test($url1),$response->content);///
+            		$modelUrls->hash = $this->hash_test($response->content);
 					$modelUrls->url = $url1;
-                    $modelUrls->ping = $this->pingsite(substr($url1,7));;//пинг
+					$modelUrls->urlhash = $this->hash_test($url1);
+                    $modelUrls->ping = '-';//пинг
 					$modelUrls->save();
 			    } else echo "Проблема соединения";
 			}
         } else {echo "Ошибка соединения\n";}
 	}
+
+    public function actionCheckDiff() //проверка уже существующих ссылок
+    {
+        $izm[]='';
+        //последовательное чтение всех ссылок из базы с расчетом и сравнением хэша
+        $find = Urls::find()->all();
+        foreach($find as $value)
+        {
+            //echo $value->url . "\n";
+            $client = new Client();
+            $response = $client->createRequest()->setUrl($value->url)
+            ->setOptions(['userAgent'=> 'Googlebot'])->send();
+            if($response->isOk)
+            {
+                if ($value->hash!=$this->hash_test($response->content))
+                {
+
+                    //echo $value->hash . '<>' . $this->hash_test($response->content) . "!!!\n";
+                    array_push($izm, $value->url);
+                }
+            } else echo "Что-то пошло не так! (проблема соединения)\n";
+        }
+        $find = Objects::find()->all();
+        foreach($find as $value)
+        {
+            //echo $value->url . "\n";
+            $client = new Client();
+            $response = $client->createRequest()->setUrl($value->url)
+            ->setOptions(['userAgent'=> 'Googlebot'])->send();
+            if($response->isOk)
+            {
+                if ($value->hash!=$this->hash_test($response->content))
+                {
+
+                    //echo $value->hash . '<>' . $this->hash_test($response->content) . "!!!\n";
+                    array_push($izm, $value->url);
+                }
+            } else echo "Что-то пошло не так! (проблема соединения)\n";
+        }
+        echo "Изменения произошли на следующих страницах/файлах:\n";
+        foreach($izm as $value)
+        {
+        	echo $value."\n";
+        }
+        //var_dump($izm);
+    }
 
 	function hash_test($content) //принимает переменную с данными и выдает хэш
 	{
@@ -132,3 +202,4 @@ class RevizController extends Controller
             else return $outping[1];*/
     }
 }    
+//9c88f4ee1327f8e753f63b1fa3c19f448a510e54!!! Kristall-kino

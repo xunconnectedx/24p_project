@@ -10,10 +10,10 @@ use yii\httpclient\Client;
 
 class RevizWgetController extends Controller
 {
-    public static $rooturl='http://kristall-kino.ru';
+    public static $rooturl='http://jomashop.com';
     public function actionWgetDownload()
     {
-        exec('wget -q -E -r -l 0 -p -U Googlebot -P site ' . 'http://kristall-kino.ru');
+        exec('wget --random-wait 4 -q -E -r -l 0 -p --user-agent="Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko" -P site ' . 'http://jomashop.com');
     }
 
     public function actionWgetRec()
@@ -55,14 +55,15 @@ class RevizWgetController extends Controller
                         $modelObjects->hash = hash_file('sha1', $val);
                         $modelObjects->url = 'http://' . substr($val,5);
                         $modelObjects->save();
-                    } else
-                    {
+                    } else {
+                    preg_match("/(.*)[^.html]/i", $val,$out);
+                    //echo $out[0];
                     $modelUrls = new Urls;  
                     $modelUrls->hash = hash_file('sha1', $val);
-                    $modelUrls->url = 'http://' . substr($val,5);
+                    $modelUrls->url = 'http://' . substr($out[0],5);
                     $modelUrls->parsed = 0;
                     //echo "Пингую: ".substr(self::$rooturl,7)."\n";
-                    $modelUrls->ping = $this->pingsite(substr($val,5));//пинг
+                    $modelUrls->ping = '-';//пинг
                     $modelUrls->save();      
                     }
                 }
