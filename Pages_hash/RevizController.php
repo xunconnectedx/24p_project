@@ -10,8 +10,8 @@ use app\models\Objects;
 use yii\httpclient\Client;
 //Yii::$classMap['Diff']='home\d1van\basicYii\commands\Difference\Diff.php';
 class RevizController extends Controller
-{   
-    public static $rooturl='http://kristall-kino.ru';
+{  
+	public static $rooturl='http://kristall-kino.ru';//домен для проверки
     public function actionIndex(/*$url*/) //первая запись в базу (корень)
     {
 		//$url = 'http://kristall-kino.ru';
@@ -27,8 +27,9 @@ class RevizController extends Controller
         	$modelUrls->hash = $this->hash_test($response->content);
 			$modelUrls->url = self::$rooturl;
             //echo $modelUrls->url;
-            if (!is_dir('site')) mkdir('site', 0777);
-            file_put_contents("site/" . $this->hash_test(self::$rooturl),$response->content);///
+            if (!is_dir('siteCheck')) mkdir('siteCheck', 0777);
+            if (!is_dir('siteCheck/'.rawurlencode(self::$rooturl))) mkdir('siteCheck/'.rawurlencode(self::$rooturl), 0777);
+            file_put_contents("siteCheck/". rawurlencode(self::$rooturl)."/". $this->hash_test(self::$rooturl),$response->content);///
 			$modelUrls->parsed = 0;
 			//$modelUrls->urlhash = $this->hash_test(self::$rooturl);
             $modelUrls->ping = $this->pingsite(substr(self::$rooturl,7));//пинг
@@ -42,7 +43,6 @@ class RevizController extends Controller
 		//$rooturl='http://kristall-kino.ru';
 		global $countDown;
 		global $countObject;
-        $GLOBALS['avail']=array(); // массив для недоступных юр
         $Pars = Urls::find()->where(['parsed'=> 0])->all(); //выбираем не спарсенные
     	foreach($Pars as $value)
     	{
@@ -87,6 +87,8 @@ class RevizController extends Controller
 		//$rooturl='http://kristall-kino.ru'; //href=\"\/user\/regis
 		global $countDown;
 		global $countObject;
+		$avail=array();
+		//$avail=array();
         $client = new Client();                               //создаем запрос
         $response = $client->createRequest()->setUrl($url)    //
         	->setOptions(['userAgent'=> 'Googlebot', 'proxy' => 'tcp://124.88.67.63:80'])->send();
@@ -116,15 +118,16 @@ class RevizController extends Controller
         				if($response->isOk)//если ответ ок, то добавляем в базу
         				{
         					$countObject = $countObject+1; //счет выгруженных ссылок
-                            if (!is_dir('site')) mkdir("site", 0777); //создаем папку для файлов
+                            if (!is_dir('siteCheck')) mkdir("siteCheck", 0777); //создаем папку для файлов
+                            if (!is_dir('siteCheck/'.rawurlencode(self::$rooturl))) mkdir('siteCheck/'.rawurlencode(self::$rooturl), 0777);
         					echo "Выгружаю в базу ".$url1."\n";
             				$modelObjects = new Objects;	//создаем экземпляр объекта таблицы
-                            file_put_contents("site/" . $this->hash_test($url1),$response->content);//сохраняем файл на диск
+                            file_put_contents("siteCheck/". rawurlencode(self::$rooturl)."/". $this->hash_test($url1),$response->content);//сохраняем файл на диск
             				$modelObjects->hash = $this->hash_test($response->content);//хэш страницы
             				//$modelObjects->urlhash = $this->hash_test($url1);//юрл-хэш
 							$modelObjects->url = $url1;//юрл
 							$modelObjects->save();//сохраняем
-			    		} else {echo "Проблема соединения"; array_push($avail,$url1);}//если соединение не удалось,
+			    		} else {echo "Проблема соединения\n"; array_push($avail,$url1); var_dump($avail);}//если соединение не удалось,
                 		continue;                                                     //то добавляем в массив недост. юрл
                 	}
         		$count = Urls::find()->where(['url' => $url1])->count(); //ищем совпадения в базе ссылок
@@ -136,17 +139,18 @@ class RevizController extends Controller
         		{
         			$countDown = $countDown+1; //счет выгруженных ссылок
         			echo "Выгружаю в базу ".$url1."\n";
-                    if (!is_dir('site')) mkdir("site", 0777); //папка для файлов
+                    if (!is_dir('siteCheck')) mkdir("siteCheck", 0777); //папка для файлов
+                    if (!is_dir('siteCheck/'.rawurlencode(self::$rooturl))) mkdir('siteCheck/'.rawurlencode(self::$rooturl), 0777);
             		$modelUrls = new Urls;	
-                    file_put_contents("site/" . $this->hash_test($url1),$response->content);///
+                    file_put_contents("siteCheck/". rawurlencode(self::$rooturl)."/". $this->hash_test($url1),$response->content);///
             		$modelUrls->hash = $this->hash_test($response->content);
 					$modelUrls->url = $url1;
 					//$modelUrls->urlhash = $this->hash_test($url1);
                     $modelUrls->ping = '-';//пинг
 					$modelUrls->save();
-			    } else {echo "Проблема соединения"; array_push($avail,$url1);}//если ошибка, запись в массив ошибок
+			    } else {echo "Проблема соединения\n"; array_push($avail,$url1); var_dump($avail);}//если ошибка, запись в массив ошибок
 			}
-        } else {echo "Ошибка соединения\n"; array_push($avail,$url1);}
+        } else {echo "Ошибка соединения\n"; array_push($avail, $url1); var_dump($avail);}
 	}
 
     public function actionCheckDiff() //проверка уже существующих ссылок
@@ -163,10 +167,8 @@ class RevizController extends Controller
             //echo $value->url."\n";
             if($response->isOk)
             {
-                if ($value->hash!=$this->hash_test($response->content))
+                if ($value->hash!=$this->hash_test($response->content))//если найдены отличия
                 {
-
-                    //echo $value->hash . '<>' . $this->hash_test($response->content) . "!!!\n";
                     array_push($izm, $value->url);
                     file_put_contents("filediff.html", $response->content);
                     echo "\nСравниваю файл:".$value->url."\n";
@@ -193,7 +195,7 @@ class RevizController extends Controller
                 }
             } else echo "Что-то пошло не так! (проблема соединения)\n";
         }
-        echo "Изменения произошли на следующих страницах/файлах:";
+        echo "\nИзменения произошли на следующих страницах/файлах:";
         foreach($izm as $value)
         {
 
@@ -212,47 +214,48 @@ class RevizController extends Controller
 
     function Differences($file1,$file2,$url)
     {
-    //echo file_get_contents("site/".$file1);
-    similar_text(file_get_contents("site/".$file1), file_get_contents($file2), $percent);
-    //html префикс
-    $fear1='<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    	//echo file_get_contents("site/".$file1);
+    	similar_text(file_get_contents("siteCheck/". rawurlencode(self::$rooturl)."/".$file1), file_get_contents($file2), $percent);
+   		//html префикс
+    	$fear1='<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
     <html><head><meta http-equiv="Content-type" content="text/html; charset=utf-8"/>
     <title>CHECK DIFFERENCES ['.$url.']</title>
     <link rel="stylesheet" href="../styles.css" type="text/css" charset="utf-8"/>
     </head><body><h1>DIFFERENCES ['.$url.']</h1><br><h1>Процент совпадений - '.$percent.'%</h1><hr/>';
-    //html постфикс
-    $fear2 = '</pre></body></html>';
-    $sitefolder='sitename';//передавать эту переменную скрипту
-    require_once dirname(__FILE__).'/Difference/Diff.php';
-    //echo  dirname(__FILE__).'/Difference/Diff.php';
-    $a = explode("\n", file_get_contents("site/"./*dirname(__FILE__).'/'.*/$file1));
-    $b = explode("\n", file_get_contents(/*dirname(__FILE__).'/'.*/$file2));
-    //echo "file1 ".$file1."and file2 ".$file2."\n";
+    	//html постфикс
+    	$fear2 = '</pre></body></html>';
+    	$sitefolder=rawurlencode(self::$rooturl);//передавать эту переменную скрипту
+    	require_once dirname(__FILE__).'/Difference/Diff.php';
+    	//echo  dirname(__FILE__).'/Difference/Diff.php';
+    	$a = explode("\n", file_get_contents("siteCheck/". rawurlencode(self::$rooturl)."/"./*dirname(__FILE__).'/'.*/$file1));
+    	$b = explode("\n", file_get_contents(/*dirname(__FILE__).'/'.*/$file2));
+    	//echo "file1 ".$file1."and file2 ".$file2."\n";
 
-    $options = array(
-        //'ignoreWhitespace' => true,
-        //'ignoreCase' => true,
-                    );
+    	$options = array(
+        	//'ignoreWhitespace' => true,
+        	//'ignoreCase' => true,
+        	            );
 
-        // Initialize the diff class
-    $diff = new \Diff($a, $b, $options);
+        	// Initialize the diff class
+    	$diff = new \Diff($a, $b, $options);
 
-    // Generate a side by side diff
-    require_once dirname(__FILE__).'/Difference/Diff/Renderer/Html/SideBySide.php';
-    $renderer = new \Diff_Renderer_Html_SideBySide;
-    $resp=$diff->Render($renderer);
-    if ($resp!='') 
-    {
-    	$out=$fear1 . $resp . $fear2;
-    	if (!is_dir('commands/diffs/'.$sitefolder)) mkdir('commands/diffs/'.$sitefolder, 0777); //папка для файлов
-    	//foreach (glob('commands/diffs/'.$sitefolder."/*") as $file) unlink($file);
-    	file_put_contents('commands/diffs/'.$sitefolder.'/'.date('d.m_H:i').'-'.$file1.'.html', $out);
-    	//FILE_APPEND^^^^^^^^^^
-	}
+    	// Generate a side by side diff
+    	require_once dirname(__FILE__).'/Difference/Diff/Renderer/Html/SideBySide.php';
+    	$renderer = new \Diff_Renderer_Html_SideBySide;
+    	$resp=$diff->Render($renderer);
+    	if ($resp!='') 
+    	{
+    		echo "Различия найдены!";
+    		$out=$fear1 . $resp . $fear2;
+    		if (!is_dir('commands/diffs/'.$sitefolder)) mkdir('commands/diffs/'.$sitefolder, 0777); //папка для файлов
+    		//foreach (glob('commands/diffs/'.$sitefolder."/*") as $file) unlink($file);
+    		file_put_contents('commands/diffs/'.$sitefolder.'/'.date('d.m_H:i').'-'.$file1.'.html', $out);
+    		//FILE_APPEND^^^^^^^^^^
+		} else echo "Различия NULL!!!";
     }
 
-	    function pingsite($url) // П Е Р Е Д Е Л А Т Ь
+	function pingsite($url) // П Е Р Е Д Е Л А Т Ь
     {
     	return '-';
         /*$ping = exec('ping -c2 ' . $url);
@@ -261,4 +264,3 @@ class RevizController extends Controller
             else return $outping[1];*/
     }
 }    
-//9c88f4ee1327f8e753f63b1fa3c19f448a510e54!!! Kristall-kino
