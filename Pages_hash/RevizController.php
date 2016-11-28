@@ -8,31 +8,30 @@ use yii\console\Controller;
 use app\models\Urls;
 use app\models\Objects;
 use yii\httpclient\Client;
-//Yii::$classMap['Diff']='home\d1van\basicYii\commands\Difference\Diff.php';
+
 class RevizController extends Controller
-{  
-	public static $rooturl='http://kristall-kino.ru';//домен для проверки
-    public function actionIndex(/*$url*/) //первая запись в базу (корень)
+{  	
+	public $avail=array();
+	public $rooturl;//='http://kristall-kino.ru';//домен для проверки
+    public function actionIndex() //первая запись в базу (корень)
     {
 		//$url = 'http://kristall-kino.ru';
         $client = new Client();
         $response = $client->createRequest()
-        	->setUrl(self::$rooturl)->setOptions(['userAgent'=> 'Googlebot', 'proxy' => 'tcp://124.88.67.63:80'])
+        	->setUrl($this->rooturl)->setOptions(['userAgent'=> 'Googlebot', 'proxy' => 'tcp://124.88.67.63:80'])
         	->send();
         if($response->isOk)
         {
-            //mkdir(substr(self::$rooturl,7), 0700);
-            //file_put_contents(substr(self::$rooturl,7) . '/' . substr(self::$rooturl,7),$response->content);
         	$modelUrls = new Urls;	
         	$modelUrls->hash = $this->hash_test($response->content);
-			$modelUrls->url = self::$rooturl;
+			$modelUrls->url = $this->rooturl;
             //echo $modelUrls->url;
             if (!is_dir('siteCheck')) mkdir('siteCheck', 0777);
-            if (!is_dir('siteCheck/'.rawurlencode(self::$rooturl))) mkdir('siteCheck/'.rawurlencode(self::$rooturl), 0777);
-            file_put_contents("siteCheck/". rawurlencode(self::$rooturl)."/". $this->hash_test(self::$rooturl),$response->content);///
+            if (!is_dir('siteCheck/'.rawurlencode($this->rooturl))) mkdir('siteCheck/'.rawurlencode($this->rooturl), 0777);
+            file_put_contents("siteCheck/". rawurlencode($this->rooturl)."/". $this->hash_test($this->rooturl),$response->content);///
 			$modelUrls->parsed = 0;
-			//$modelUrls->urlhash = $this->hash_test(self::$rooturl);
-            $modelUrls->ping = $this->pingsite(substr(self::$rooturl,7));//пинг
+            $modelUrls->ping = $this->pingsite(substr($this->rooturl,7));//пинг
+            $modelUrls->sites_id = 1;// И З М Е Н И Т Ь
 			$modelUrls->save();
         }
         else echo "Проблема соединения!\n";
@@ -40,10 +39,9 @@ class RevizController extends Controller
     
 	public function actionPars() //парсинг из базы (по параметру parsed=0)
 	{
-		//$rooturl='http://kristall-kino.ru';
 		global $countDown;
 		global $countObject;
-        $Pars = Urls::find()->where(['parsed'=> 0])->all(); //выбираем не спарсенные
+		$Pars = Urls::find()->where(['parsed'=> 0])->all(); //выбираем не спарсенные
     	foreach($Pars as $value)
     	{
     		$oldCountDown = $countDown;
@@ -75,7 +73,7 @@ class RevizController extends Controller
                 }                            /////////////////////
                 echo "Всего добавленно ".$countDown." ссылок и ".$countObject." объектов.\n"; //вывод кол-ва обр. объектов
                 echo "Недоступные страницы/файлы:\n";/////////////////////
-                foreach($avail as $value)            //Вывод недоступных//
+                foreach($this->avail as $value)            //Вывод недоступных//
                 {                                    //страниц сайта    //
                     echo $value."\n";                /////////////////////
                 }
@@ -87,8 +85,6 @@ class RevizController extends Controller
 		//$rooturl='http://kristall-kino.ru'; //href=\"\/user\/regis
 		global $countDown;
 		global $countObject;
-		$avail=array();
-		//$avail=array();
         $client = new Client();                               //создаем запрос
         $response = $client->createRequest()->setUrl($url)    //
         	->setOptions(['userAgent'=> 'Googlebot', 'proxy' => 'tcp://124.88.67.63:80'])->send();
@@ -100,7 +96,7 @@ class RevizController extends Controller
         	//var_dump($out); //css js jpg png
 			foreach($out[1] as $value)
 			{
-				$url1 = self::$rooturl.$value; //забиваем найденную ссылку
+				$url1 = $this->rooturl.$value; //забиваем найденную ссылку
 				if (substr_count($value, '\/')) {continue;}
                 if ((substr_count($value, '.jpg')||substr_count($value, '.JPG')||substr_count($value, '.PNG')||substr_count($value, '.png')||substr_count($value, '.css')||substr_count($value, '.CSS')||substr_count($value, '.js')||substr_count($value, '.JS')||substr_count($value, '.swf')||substr_count($value, '.SWF')||substr_count($value, '.ico')||substr_count($value, '.ICO'))>0) 
                 	{
@@ -108,9 +104,7 @@ class RevizController extends Controller
                 		$count = Objects::find()->where(['url' => $url1])->count(); //ищем совпадения в базе объектов
         				if ($count>0) //если совпадения найдены, то скипаем
                             {
-                                /*$find = Objects::find()->where(['url' => $url1])->one();////////////
-                                if ($find->hash==hash_test($response->content)) {*/continue;/*}
-                                else $izm =*/
+                                continue;
                             }
         				$client = new Client(); //создаем запрос для ссылки со страницы
         				$response = $client->createRequest()->setUrl($url1)
@@ -119,15 +113,15 @@ class RevizController extends Controller
         				{
         					$countObject = $countObject+1; //счет выгруженных ссылок
                             if (!is_dir('siteCheck')) mkdir("siteCheck", 0777); //создаем папку для файлов
-                            if (!is_dir('siteCheck/'.rawurlencode(self::$rooturl))) mkdir('siteCheck/'.rawurlencode(self::$rooturl), 0777);
+                            if (!is_dir('siteCheck/'.rawurlencode($this->rooturl))) mkdir('siteCheck/'.rawurlencode($this->rooturl), 0777);
         					echo "Выгружаю в базу ".$url1."\n";
             				$modelObjects = new Objects;	//создаем экземпляр объекта таблицы
-                            file_put_contents("siteCheck/". rawurlencode(self::$rooturl)."/". $this->hash_test($url1),$response->content);//сохраняем файл на диск
+                            file_put_contents("siteCheck/". rawurlencode($this->rooturl)."/". $this->hash_test($url1),$response->content);//сохраняем файл на диск
             				$modelObjects->hash = $this->hash_test($response->content);//хэш страницы
-            				//$modelObjects->urlhash = $this->hash_test($url1);//юрл-хэш
 							$modelObjects->url = $url1;//юрл
+                            $modelObjects->sites_id = 1;// И З М Е Н И Т Ь
 							$modelObjects->save();//сохраняем
-			    		} else {echo "Проблема соединения\n"; array_push($avail,$url1); var_dump($avail);}//если соединение не удалось,
+			    		} else {echo "Проблема соединения\n"; array_push($this->avail,$url1);}//если соединение не удалось,
                 		continue;                                                     //то добавляем в массив недост. юрл
                 	}
         		$count = Urls::find()->where(['url' => $url1])->count(); //ищем совпадения в базе ссылок
@@ -140,17 +134,17 @@ class RevizController extends Controller
         			$countDown = $countDown+1; //счет выгруженных ссылок
         			echo "Выгружаю в базу ".$url1."\n";
                     if (!is_dir('siteCheck')) mkdir("siteCheck", 0777); //папка для файлов
-                    if (!is_dir('siteCheck/'.rawurlencode(self::$rooturl))) mkdir('siteCheck/'.rawurlencode(self::$rooturl), 0777);
+                    if (!is_dir('siteCheck/'.rawurlencode($this->rooturl))) mkdir('siteCheck/'.rawurlencode($this->rooturl), 0777);
             		$modelUrls = new Urls;	
-                    file_put_contents("siteCheck/". rawurlencode(self::$rooturl)."/". $this->hash_test($url1),$response->content);///
+                    file_put_contents("siteCheck/". rawurlencode($this->rooturl)."/". $this->hash_test($url1),$response->content);///
             		$modelUrls->hash = $this->hash_test($response->content);
 					$modelUrls->url = $url1;
-					//$modelUrls->urlhash = $this->hash_test($url1);
                     $modelUrls->ping = '-';//пинг
+                    $modelUrls->sites_id = 1;// И З М Е Н И Т Ь
 					$modelUrls->save();
-			    } else {echo "Проблема соединения\n"; array_push($avail,$url1); var_dump($avail);}//если ошибка, запись в массив ошибок
+			    } else {echo "Проблема соединения\n"; array_push($this->avail,$url1);}//если ошибка, запись в массив ошибок
 			}
-        } else {echo "Ошибка соединения\n"; array_push($avail, $url1); var_dump($avail);}
+        } else {echo "Ошибка соединения\n"; array_push($this->avail, $url);}
 	}
 
     public function actionCheckDiff() //проверка уже существующих ссылок
@@ -179,6 +173,8 @@ class RevizController extends Controller
         $find = Objects::find()->all();
         foreach($find as $value)
         {
+        	if ((substr_count($value->url, '.jpg')||substr_count($value->url, '.JPG')||substr_count($value->url, '.PNG')||substr_count($value->url, '.png')||substr_count($value->url, '.swf')||substr_count($value->url, '.SWF')||substr_count($value->url, '.ico')||substr_count($value->url, '.ICO'))>0) { continue; } 
+              
             //echo $value->url . "\n";
             $client = new Client();
             $response = $client->createRequest()->setUrl($value->url)
@@ -215,7 +211,7 @@ class RevizController extends Controller
     function Differences($file1,$file2,$url)
     {
     	//echo file_get_contents("site/".$file1);
-    	similar_text(file_get_contents("siteCheck/". rawurlencode(self::$rooturl)."/".$file1), file_get_contents($file2), $percent);
+    	similar_text(file_get_contents("siteCheck/". rawurlencode($this->rooturl)."/".$file1), file_get_contents($file2), $percent);
    		//html префикс
     	$fear1='<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -225,10 +221,10 @@ class RevizController extends Controller
     </head><body><h1>DIFFERENCES ['.$url.']</h1><br><h1>Процент совпадений - '.$percent.'%</h1><hr/>';
     	//html постфикс
     	$fear2 = '</pre></body></html>';
-    	$sitefolder=rawurlencode(self::$rooturl);//передавать эту переменную скрипту
+    	$sitefolder=rawurlencode($this->rooturl);//передавать эту переменную скрипту
     	require_once dirname(__FILE__).'/Difference/Diff.php';
     	//echo  dirname(__FILE__).'/Difference/Diff.php';
-    	$a = explode("\n", file_get_contents("siteCheck/". rawurlencode(self::$rooturl)."/"./*dirname(__FILE__).'/'.*/$file1));
+    	$a = explode("\n", file_get_contents("siteCheck/". rawurlencode($this->rooturl)."/"./*dirname(__FILE__).'/'.*/$file1));
     	$b = explode("\n", file_get_contents(/*dirname(__FILE__).'/'.*/$file2));
     	//echo "file1 ".$file1."and file2 ".$file2."\n";
 
@@ -258,9 +254,11 @@ class RevizController extends Controller
 	function pingsite($url) // П Е Р Е Д Е Л А Т Ь
     {
     	return '-';
-        /*$ping = exec('ping -c2 ' . $url);
-        preg_match("/\/([0-9]*\.[0-9]*)\/[0-9]*\./", $ping, $outping);
-        if (empty($outping)) return '-';
-            else return $outping[1];*/
     }
 }    
+//
+// 1. Подсчет измененных строк
+// 2. Время загрузки страницы
+// 3. Привязка с базе с сайтами
+// Изначально в таблице сайтов -> анализ и запись в pages
+?>
