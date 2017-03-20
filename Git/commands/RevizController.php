@@ -3,6 +3,7 @@
 namespace app\commands;
 
 use app\models\Objects;
+use app\models\PageHasObjects;
 use app\models\Urls;
 use yii\console\Controller;
 use yii\httpclient\Client;
@@ -13,6 +14,50 @@ class RevizController extends Controller
     public $idsite;
     public $proxy = 'tcp://124.88.67.10:81';
     public $rooturl; //='http://kristall-kino.ru';//домен для проверки
+
+    public function actionHeaders()
+    {
+        $url = 'https://google.ru';
+        echo "Headers checking [" . $url . "]\n";
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HEADER, 1);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_NOBODY, 1);
+        $result = curl_exec($ch);
+        curl_close($ch);
+
+        if (strpos($result, 'Strict-Transport-Security') === false) {
+            echo "HSTS не найден!\n";
+        }
+
+        if (strpos($result, 'X-XSS-Protection') === false) {
+            echo "Защита от XSS атак не обнаружена!\n";
+        }
+
+        if (strpos($result, 'X-Frame-Options') === false) {
+            echo "Защита от кликджекинг-атак не обнаружена!\n";
+        }
+
+        if (strpos($result, 'X-Content-Type-Options') === false) {
+            echo "Защита от подмены MIME типов не найдена!\n";
+        }
+
+        if (strpos($result, 'Content-Security-Policy') === false) {
+            echo "CSP не найден!\n";
+        }
+
+        //echo $result;
+    }
+
+    public function actionGoogle()
+    {
+        $url = 'https://kristall-kino.ru'; //адрес для проверки
+        $API = 'AIzaSyBhsYWCk5ULYnT0wfl7WcumZeYjkHrNWXM';
+        $gurl = 'https://www.googleapis.com/pagespeedonline/v2/runPagespeed?url=' . urlencode($url) . '&locale=ru&screenshot=true&key=' . $API;
+        echo file_get_contents($gurl);
+
+    }
 
     public function Index() //первая запись в базу (корень)
 
@@ -62,7 +107,7 @@ class RevizController extends Controller
         $Pars = Urls::find()->where(['parsed' => 0])->all(); //выбираем не спарсенные
         foreach ($Pars as $value) {
             $oldCountDown = $countDown;
-            $this->Parsing($value['url']); //вызов функции поиска ссылок на странице
+            $this->Parsing($value['url'], $value->id); //вызов функции поиска ссылок на странице
             $modelUrls = Urls::find() //находим рабочий элемент и выставляем парс=1
                 ->where(['url' => $value['url']])
                 ->one();
@@ -96,7 +141,7 @@ class RevizController extends Controller
         }
     }
 
-    public function Parsing($url)
+    public function Parsing($url, $id_pg)
     {
         //$rooturl='http://kristall-kino.ru'; //href=\"\/user\/regis
         global $countDown;
@@ -110,10 +155,6 @@ class RevizController extends Controller
             //$pattern1 = "/<a.*href=\"\/(.*)\">/Uis"; //для ссылок
             $pattern = "#\s(?:href|src|url)=(?:[\"\'])?([^http,mailto,\#,\"].*?)(?:[\"\'])?(?:[\s\>])#i"; //для всего
             preg_match_all($pattern, $response->content, $out); //ищем ссылки по паттерну
-            //var_dump($out); //css js jpg png
-
-            //ЗДЕСЬ МОЖНО СДЕЛАТЬ ПРИВЯЗКУ К ЮРЛ,
-            //НА КОТОРОЙ НАЙДЕТСЯ ОБЪЕКТ
 
             foreach ($out[1] as $value) {
                 $url1 = $this->rooturl . $value; //забиваем найденную ссылку
@@ -143,13 +184,16 @@ class RevizController extends Controller
                         $modelObjects = new Objects; //создаем экземпляр объекта таблицы
                         file_put_contents("siteCheck/" . rawurlencode($this->rooturl) . "/" . $this->hashTest($url1), $response->content); //сохраняем файл на диск
                         $modelObjects->hash = $this->hashTest($response->content); //хэш страницы
-
-                        //А ТУТ СДЕЛАТЬ ЗАПИСЬ, ЧТО ОБЪЕКТ ОТНОСИТСЯ К ТОЙ ССЫЛКЕ
-
                         $modelObjects->url = $url1; //юрл
                         $modelObjects->datech = date('Y-m-d'); //дата проверки
                         $modelObjects->sites_id = $this->idsite; // И З М Е Н И Т Ь (все уже?)
                         $modelObjects->save(); //сохраняем
+
+                        $modelPageHasObjects = new PageHasObjects; //запись соответствия айди страницы и айди объектов на ней
+                        $modelPageHasObjects->page_id = $id_pg;
+                        $modelPageHasObjects->objects_ids = $modelObjects->id;
+                        $modelPageHasObjects->save();
+
                     } else {
                         echo "Проблема соединения! (" . $url1 . ")\n";
                         array_push($this->avail, $url1);} //если соединение не удалось,
