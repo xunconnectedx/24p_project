@@ -50,14 +50,90 @@ class RevizController extends Controller
         //echo $result;
     }
 
-    public function actionGoogle()
+    public function actionToGoogle()
+    /*composer require dsentker/phpinsights*/
+    {
+    	require "./vendor/autoload.php";
+ 		$uri = 'https://kristall-kino.ru';
+		$caller = new \PhpInsights\InsightsCaller('AIzaSyBhsYWCk5ULYnT0wfl7WcumZeYjkHrNWXM', 'ru');
+		$response = $caller->getResponse($uri, \PhpInsights\InsightsCaller::STRATEGY_DESKTOP);
+		$result = $response->getMappedResult();
+ 
+		echo "Оценка скорости сайта по версии Google : " . $result->getSpeedScore() . PHP_EOL;
+		/*For mobile test only*/
+		//echo "Your site usability score is : " . $result->getUsabilityScore();
+
+		/** @var \PhpInsights\Result\InsightsResult $result */
+		foreach($result->getFormattedResults()->getRuleResults() as $rule => $ruleResult) 
+		{
+ 
+    		/*
+     		* If the rule impact is zero, it means that the website has passed the test.
+     		*/
+    		if($ruleResult->getRuleImpact() > 0) 
+    		{
+ 
+        		//echo "RULE:";
+        		//var_dump($rule); // AvoidLandingPageRedirects
+        		echo "Заголовок:";
+        		echo $ruleResult->getLocalizedRuleName()."\n";
+        		//var_dump($ruleResult->getLocalizedRuleName()); // "Zielseiten-Weiterleitungen vermeiden"
+ 
+        		/*
+         		* The getDetails() method is a wrapper to get the `summary` field as well as `Urlblocks` data. You
+         		* can use $ruleResult->getUrlBlocks() and $ruleResult->getSummary() instead. 
+         		*/
+        		$i=0;
+        		foreach($ruleResult->getDetails() as $block) 
+        		{
+            		if ($i==0) echo "Совет:";
+            		else echo $i.": ";
+            		$i++;
+            		echo $block->toString()."\n";
+            		//var_dump($block->toString()); // "Auf Ihrer Seite sind keine Weiterleitungen vorhanden"
+        		}
+        	echo "----------------------------------------------\n";
+ 
+    		}
+ 
+		}
+    }
+   
+    /*public function actionGoogle()
     {
         $url = 'https://kristall-kino.ru'; //адрес для проверки
         $API = 'AIzaSyBhsYWCk5ULYnT0wfl7WcumZeYjkHrNWXM';
-        $gurl = 'https://www.googleapis.com/pagespeedonline/v2/runPagespeed?url=' . urlencode($url) . '&locale=ru&screenshot=true&key=' . $API;
-        echo file_get_contents($gurl);
+        $gurl = 'https://www.googleapis.com/pagespeedonline/v2/runPagespeed?url=' . urlencode($url) . '&locale=ru&screenshot=false&key=' . $API;
+        $result = json_decode(file_get_contents($gurl), true);
+        //print_r($result);
+        /*echo $result['pageStats']['numberJsResources'];
+        foreach ($result["formattedResults"]["ruleResults"] as $key => $value) 
+        {
+            echo "Category: " . $value["localizedRuleName"] . "\n";
+            //$this->echoFormat($value['summary']);
+            unset($result["formattedResults"]["ruleResults"][$key]['summary']);
+        }
+        var_dump($result["formattedResults"]["ruleResults"]);
+    }*/
 
-    }
+    /*private function echoFormat($summary)
+    {
+        $format = $summary['format'];
+        $args = isset($summary['args']) ? $summary['args'] : [];
+        $args_arr = [];
+        foreach ($args as $key => $value) {
+            switch ($value['type']) {
+                case 'URL':
+                    $args_arr['{{URL}}'] = $value['value'];
+                    break;
+
+                default:
+                    $args_arr['{{' . $value['key'] . '}}'] = $value['value'];
+                    break;
+            }
+        }
+        echo str_replace(array_keys($args_arr), array_values($args_arr), $format) . "\n";
+    }*/
 
     public function Index() //первая запись в базу (корень)
 
