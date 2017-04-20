@@ -15,10 +15,40 @@ class RevizController extends Controller
     public $proxy = 'tcp://124.88.67.10:81';
     public $rooturl; //='http://kristall-kino.ru';//домен для проверки
 
+    //SEO - task
+    public function actionValidator(/*здесь $url*/)
+    {
+    	$url="http://kristall-kino.ru"; //для проверки
+    	$patt="https://validator.w3.org/nu/?doc=".rawurlencode($url)."&checkerrorpages=yes&showoutline=yes"; //собираем строку для запроса в curl
+    	$ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $patt);
+        //curl_setopt($ch, CURLOPT_HEADER, 1);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (X11; U; SunOS sun4u; en-US; rv:1.9b5) Gecko/2008032620 Firefox/3.0b5');
+        $result = curl_exec($ch);
+        curl_close($ch);
+        file_put_contents('w3http-'.rawurlencode($url).'.html', $result); //необходимо поправить кодировки
+        //необходимо взять CSS для нормального отображения
+
+        $patt="http://jigsaw.w3.org/css-validator/validator?uri=".rawurlencode($url)."&profile=css3&usermedium=all&warning=1&vextwarning=&lang=ru";
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $patt);
+        //curl_setopt($ch, CURLOPT_HEADER, 1);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (X11; U; SunOS sun4u; en-US; rv:1.9b5) Gecko/2008032620 Firefox/3.0b5');
+        $result = curl_exec($ch);
+        curl_close($ch);
+        file_put_contents('w3css-'.rawurlencode($url).'.html', $result); //поправить CSS для результата
+        //также необходим CSS с сайта для норм. отображения
+        //реализовать вывод исправленного CSS в отдельный файл.
+        //http://jigsaw.w3.org/css-validator/DOWNLOAD.html показать
+
+    }
+
+    //Проверка заголовков
     public function actionHeaders()
     {
         $url = 'https://google.ru';
-        echo "Headers checking [" . $url . "]\n";
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HEADER, 1);
@@ -26,30 +56,32 @@ class RevizController extends Controller
         curl_setopt($ch, CURLOPT_NOBODY, 1);
         $result = curl_exec($ch);
         curl_close($ch);
-
+        $ok=0; //переменная для проверки 0 ошибок
+        echo "Анализ заголовков страницы [" . $url . "]:\n";
         if (strpos($result, 'Strict-Transport-Security') === false) {
-            echo "HSTS не найден!\n";
+            echo "HSTS не найден!\n"; $ok++;
         }
 
         if (strpos($result, 'X-XSS-Protection') === false) {
-            echo "Защита от XSS атак не обнаружена!\n";
+            echo "Защита от XSS атак не обнаружена!\n"; $ok++;
         }
 
         if (strpos($result, 'X-Frame-Options') === false) {
-            echo "Защита от кликджекинг-атак не обнаружена!\n";
+            echo "Защита от кликджекинг-атак не обнаружена!\n"; $ok++;
         }
 
         if (strpos($result, 'X-Content-Type-Options') === false) {
-            echo "Защита от подмены MIME типов не найдена!\n";
+            echo "Защита от подмены MIME типов не найдена!\n"; $ok++;
         }
 
         if (strpos($result, 'Content-Security-Policy') === false) {
-            echo "CSP не найден!\n";
+            echo "CSP не найден!\n"; $ok++;
         }
-
+        if ($ok==0) echo "Проблемы не обнаружены!\n"; 
         //echo $result;
     }
 
+    //Проверка на сервисе гугл
     public function actionToGoogle()
     /*composer require dsentker/phpinsights*/
     {
@@ -93,50 +125,12 @@ class RevizController extends Controller
             		//var_dump($block->toString()); // "Auf Ihrer Seite sind keine Weiterleitungen vorhanden"
         		}
         	echo "----------------------------------------------\n";
- 
     		}
- 
 		}
     }
    
-    /*public function actionGoogle()
-    {
-        $url = 'https://kristall-kino.ru'; //адрес для проверки
-        $API = 'AIzaSyBhsYWCk5ULYnT0wfl7WcumZeYjkHrNWXM';
-        $gurl = 'https://www.googleapis.com/pagespeedonline/v2/runPagespeed?url=' . urlencode($url) . '&locale=ru&screenshot=false&key=' . $API;
-        $result = json_decode(file_get_contents($gurl), true);
-        //print_r($result);
-        /*echo $result['pageStats']['numberJsResources'];
-        foreach ($result["formattedResults"]["ruleResults"] as $key => $value) 
-        {
-            echo "Category: " . $value["localizedRuleName"] . "\n";
-            //$this->echoFormat($value['summary']);
-            unset($result["formattedResults"]["ruleResults"][$key]['summary']);
-        }
-        var_dump($result["formattedResults"]["ruleResults"]);
-    }*/
-
-    /*private function echoFormat($summary)
-    {
-        $format = $summary['format'];
-        $args = isset($summary['args']) ? $summary['args'] : [];
-        $args_arr = [];
-        foreach ($args as $key => $value) {
-            switch ($value['type']) {
-                case 'URL':
-                    $args_arr['{{URL}}'] = $value['value'];
-                    break;
-
-                default:
-                    $args_arr['{{' . $value['key'] . '}}'] = $value['value'];
-                    break;
-            }
-        }
-        echo str_replace(array_keys($args_arr), array_values($args_arr), $format) . "\n";
-    }*/
-
+   //Сбор данных о всех страницах (первая запись)
     public function Index() //первая запись в базу (корень)
-
     {
         $count = Urls::find()->where(['url' => $this->rooturl])->count(); //ищем совпадения в базе
         if ($count == 0) //если домен уже есть, то скипаем
@@ -175,8 +169,8 @@ class RevizController extends Controller
         }
     }
 
+    //Выбор данных из базы и дальнейший парс
     public function Pars() //парсинг из базы (по параметру parsed=0)
-
     {
         global $countDown;
         global $countObject;
@@ -217,6 +211,7 @@ class RevizController extends Controller
         }
     }
 
+    //Функиця поиска ссылок на странице
     public function Parsing($url, $id_pg)
     {
         //$rooturl='http://kristall-kino.ru'; //href=\"\/user\/regis
@@ -313,6 +308,7 @@ class RevizController extends Controller
         //}
     }
 
+    //Время загрузки страниц
     public function TimeDwnld($content)
     {
         //возвращает время загрузки элементов страницы
@@ -339,8 +335,8 @@ class RevizController extends Controller
         return $atime;
     }
 
+    //Проверка на изменения
     public function CheckDiff() //проверка уже существующих ссылок
-
     {
         $izm[] = '';
         //последовательное чтение всех ссылок из базы с расчетом и сравнением хэша
@@ -394,8 +390,8 @@ class RevizController extends Controller
         //var_dump($izm);
     }
 
+    //Вспомогательная функция для отсева картинок и прочего
     public function findobject($url) //проверка на наличие в юрл расширения объекта
-
     {
         if ((substr_count($url, '.jpg') || substr_count($url, '.JPG') || substr_count($url, '.PNG') || substr_count($url, '.png') || substr_count($url, '.swf') || substr_count($url, '.SWF') || substr_count($url, '.ico') || substr_count($url, '.ICO') || substr_count($url, '.css') || substr_count($url, '.js')) > 0) {
             return 1;
@@ -405,16 +401,16 @@ class RevizController extends Controller
 
     }
 
+    //вычисление хэша страницы
     public function hashTest($content) //принимает переменную с данными и выдает хэш
-
     {
         file_put_contents("File.html", $content);
         return hash_file('sha1', 'File.html');
         //unlink("File.html");
     }
 
+    //Функция для проверки времени (для ф-ции TimeDwnld)
     public function DwnldTime($url) //херь
-
     {
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -427,6 +423,7 @@ class RevizController extends Controller
         curl_close($ch);
     }
 
+    //Различия
     public function Differences($file1, $file2, $url)
     {
         //echo file_get_contents("site/".$file1);
@@ -482,6 +479,7 @@ class RevizController extends Controller
         file_put_contents('commands/diffs/' . $sitefolder . '/' . date('d.m_H:i') . '-' . $file1 . '.html', $out);
     }
 
+    //Проверка на наличие в вирусных базах
     public function VirusTotal($url)
     {
         require_once 'VirusTotalApiV2.php';
@@ -497,24 +495,6 @@ class RevizController extends Controller
         //$api->displayResult($result);
 
     }
-
+};
     //http://api.urlvoid.com/api1000/4fb13462b92ab6c95206e90ec6a4eeaaa3ab6b53/host/google.com/  //URLVOID
-
     //https://sitecheck.sucuri.net/results/konti-kino.ru
-
-    /*public function controlCheck($url) //все ссылки, которые объявлены недоступными проходят повторную проверку
-
-    {
-    $client = new Client();
-    $response = $client->createRequest()
-     *//*])
-->send();
-if (!$response->isOk) {
-//не все ссылки еще есть в базе, некоторых недоступных в базе нет
-//нужно что-то другое
-}
-
-}*/
-
-}; // 1. Если страница исчезла, пометку сделать в базе+когда исчезла;
-//разгрузить код? добавить функций процедур
